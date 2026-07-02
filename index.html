@@ -28,7 +28,7 @@
   #statusBox {
     position: fixed;
     left: 12px;
-    top: 12px;
+    bottom: 12px;
     background: rgba(0,0,0,0.6);
     color: #fff;
     padding: 8px 12px;
@@ -66,6 +66,26 @@
 
   #connector { position: absolute; inset: 0; pointer-events: none; z-index: 50; display: none; width: 100%; height: 100%; }
   .maplibregl-popup-content { font-size: 13px; padding: 8px 12px; }
+
+  /* ===== 追加：地図コントロール（航空写真・3D） ===== */
+  #mapControls {
+    position: fixed; top: 12px; left: 12px; z-index: 125;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .map-ctrl-group {
+    display: flex; background: #fff; border-radius: 10px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+    border: 1px solid #e2e8f0; overflow: hidden;
+  }
+  .map-ctrl-group button {
+    border: none; background: #fff;
+    padding: 8px 14px; font-size: 13px; font-weight: 600;
+    color: #475569; cursor: pointer; transition: background .2s, color .2s;
+  }
+  .map-ctrl-group button + button { border-left: 1px solid #e2e8f0; }
+  .map-ctrl-group button.active {
+    background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%); color: #fff;
+  }
 
   /* ===== 追加①：モード切り替えボタン（マップ ⇄ 動画） ===== */
   #modeToggle {
@@ -208,6 +228,17 @@
 <div id="map"></div>
 <div id="statusBox">読み込み中...</div>
 
+<!-- 地図コントロール：航空写真切り替え・3D -->
+<div id="mapControls">
+  <div class="map-ctrl-group">
+    <button id="layerMap" class="active">地図</button>
+    <button id="layerPhoto">航空写真</button>
+  </div>
+  <div class="map-ctrl-group">
+    <button id="btn3D">3D表示</button>
+  </div>
+</div>
+
 <!-- 矢印コネクター（地図モード用） -->
 <svg id="connector" xmlns="http://www.w3.org/2000/svg">
   <defs>
@@ -296,19 +327,55 @@
     style: {
       version: 8,
       sources: {
-        'osm-tiles': {
+        osm: {
           type: 'raster',
           tiles: ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png'],
-          tileSize: 256,
+          tileSize: 256, maxzoom: 19,
           attribution: '© OpenStreetMap contributors'
+        },
+        // 国土地理院 航空写真（日本全国・無料・APIキー不要）
+        gsiphoto: {
+          type: 'raster',
+          tiles: ['https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg'],
+          tileSize: 256, maxzoom: 18,
+          attribution: '地理院タイル（航空写真）'
         }
       },
-      layers: [{ id: 'osm-tiles', type: 'raster', source: 'osm-tiles', minzoom: 0, maxzoom: 19 }]
+      layers: [
+        { id: 'osm',      type: 'raster', source: 'osm',      layout: { visibility: 'visible' } },
+        { id: 'gsiphoto', type: 'raster', source: 'gsiphoto', layout: { visibility: 'none' } }
+      ]
     },
     center: [139.9554, 35.8332], // [経度(lng), 緯度(lat)]
     zoom: 16, minZoom: 15, maxZoom: 19
   });
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }));
+
+  // --- 地図コントロール：航空写真切り替え ---
+  const layerMap = document.getElementById('layerMap');
+  const layerPhoto = document.getElementById('layerPhoto');
+  const btn3D = document.getElementById('btn3D');
+  const mapControls = document.getElementById('mapControls');
+
+  function setBaseLayer(key) {
+    const photo = key === 'photo';
+    map.setLayoutProperty('osm', 'visibility', photo ? 'none' : 'visible');
+    map.setLayoutProperty('gsiphoto', 'visibility', photo ? 'visible' : 'none');
+    layerPhoto.classList.toggle('active', photo);
+    layerMap.classList.toggle('active', !photo);
+  }
+  layerMap.addEventListener('click', () => setBaseLayer('map'));
+  layerPhoto.addEventListener('click', () => setBaseLayer('photo'));
+
+  // --- 3D（地図を傾けて立体表示） ---
+  let is3D = false;
+  function toggle3D() {
+    is3D = !is3D;
+    map.easeTo({ pitch: is3D ? 60 : 0, bearing: is3D ? -20 : 0, duration: 600 });
+    btn3D.classList.toggle('active', is3D);
+    btn3D.textContent = is3D ? '2Dに戻す' : '3D表示';
+  }
+  btn3D.addEventListener('click', toggle3D);
 
   // --- 2. 画面要素の取得と変数定義 ---
   const panel = document.getElementById("videoPanel");
@@ -479,6 +546,7 @@
      ============================================================ */
   const btnMap = document.getElementById('btnMap');
   const btnFeed = document.getElementById('btnFeed');
+  const modeToggle = document.getElementById('modeToggle');
   const feedOverlay = document.getElementById('feedOverlay');
   const feedFrame = document.getElementById('feedFrame');
   const feedTitle = document.getElementById('feedTitle');
@@ -508,12 +576,16 @@
       btnFeed.classList.add('active');
       btnMap.classList.remove('active');
       feedOverlay.style.display = 'flex';
+      modeToggle.style.display = 'none';   // 重なり防止：フィードのタブと被らないよう隠す
+      mapControls.style.display = 'none';
       closeVideo();              // 地図用パネルは閉じる
       showFeed(feedIndex);       // 現在位置の動画を表示
     } else {
       btnMap.classList.add('active');
       btnFeed.classList.remove('active');
       feedOverlay.style.display = 'none';
+      modeToggle.style.display = 'flex';
+      mapControls.style.display = 'flex';
       feedFrame.src = '';        // 再生停止
       showVideoTab();            // タブを動画側に戻しておく
     }
