@@ -2,244 +2,316 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>麗澤大学キャンパスマップ (MapLibre版)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>yoh-map | 麗澤大学キャンパスマップ</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.0/dist/maplibre-gl.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
-  * { box-sizing: border-box; }
-  body { margin: 0; font-family: "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif; background: #f3f7fb; overflow: hidden; }
-  #map { width: 100vw; height: 100vh; z-index: 1; }
-
-  /* ===== 既存：地図モードのサイド動画パネル ===== */
-  #videoPanel {
-    position: fixed;
-    top: 50%;
-    right: 20px;
-    width: min(560px, 90vw);
-    background: #ffffff;
-    border-radius: 16px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-    overflow: hidden;
-    display: none;
-    z-index: 100;
-    transform: translateY(-50%);
-    transition: opacity 0.3s ease;
+  :root {
+    --brand: #4a90e2;
+    --brand-dark: #357abd;
+    --ink: #0f172a;
+    --panel: rgba(255,255,255,0.92);
+    --glass: rgba(255,255,255,0.14);
+    --glass-border: rgba(255,255,255,0.25);
+    --radius: 16px;
   }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: "Zen Kaku Gothic New", "Hiragino Sans", "Noto Sans JP", sans-serif;
+    background: var(--ink);
+    overflow: hidden;
+  }
+  #map { position: fixed; inset: 0; z-index: 1; }
+
+  /* ============ ローディング画面 ============ */
+  #splash {
+    position: fixed; inset: 0; z-index: 500;
+    background: radial-gradient(120% 120% at 50% 30%, #1e3a5f 0%, #0f172a 60%);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px; color: #fff;
+    transition: opacity .8s ease, visibility .8s;
+  }
+  #splash.hide { opacity: 0; visibility: hidden; pointer-events: none; }
+  #splash .logo {
+    font-size: clamp(2.4rem, 8vw, 3.6rem);
+    font-weight: 900; letter-spacing: .04em;
+    background: linear-gradient(135deg, #7db8f0, #4a90e2 45%, #9ae6b4);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  #splash .sub { font-size: 14px; color: #94a3b8; letter-spacing: .2em; }
+  #splash .loader {
+    margin-top: 10px; width: 160px; height: 3px; border-radius: 3px;
+    background: rgba(255,255,255,0.12); overflow: hidden; position: relative;
+  }
+  #splash .loader::after {
+    content: ""; position: absolute; left: -40%; top: 0; height: 100%; width: 40%;
+    border-radius: 3px; background: linear-gradient(90deg, transparent, #4a90e2, transparent);
+    animation: slide 1.1s infinite;
+  }
+  @keyframes slide { to { left: 100%; } }
+  #splashStatus { font-size: 12px; color: #64748b; min-height: 1.2em; }
+
+  /* ============ 地図上のUI（グラス調） ============ */
+  .glass-group {
+    display: flex; border-radius: 12px; overflow: hidden;
+    background: rgba(15,23,42,0.55);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  }
+  .glass-group button {
+    border: none; background: transparent; color: #e2e8f0;
+    padding: 9px 14px; font-size: 13px; font-weight: 700; cursor: pointer;
+    font-family: inherit; transition: background .2s, color .2s;
+    white-space: nowrap;
+  }
+  .glass-group button + button { border-left: 1px solid rgba(255,255,255,0.12); }
+  .glass-group button.active {
+    background: linear-gradient(135deg, var(--brand), var(--brand-dark)); color: #fff;
+  }
+
+  #mapControls {
+    position: fixed; top: calc(12px + env(safe-area-inset-top)); left: 12px; z-index: 125;
+    display: flex; flex-direction: column; gap: 8px; align-items: flex-start;
+  }
+
+  #brandTag {
+    position: fixed; top: calc(12px + env(safe-area-inset-top)); right: 12px; z-index: 125;
+    background: rgba(15,23,42,0.55); backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border); border-radius: 999px;
+    color: #fff; font-weight: 900; font-size: 14px; letter-spacing: .03em;
+    padding: 8px 16px; pointer-events: none;
+  }
+  #brandTag span { color: #7db8f0; }
+
+  #modeToggle {
+    position: fixed; bottom: calc(20px + env(safe-area-inset-bottom)); left: 50%;
+    transform: translateX(-50%); z-index: 130;
+    border-radius: 999px;
+  }
+  #modeToggle button { padding: 12px 26px; font-size: 14px; }
+
   #statusBox {
-    position: fixed;
-    left: 12px;
-    bottom: 12px;
-    background: rgba(0,0,0,0.6);
-    color: #fff;
-    padding: 8px 12px;
-    border-radius: 8px;
-    font-size: 13px;
-    z-index: 120;
-    backdrop-filter: blur(4px);
+    position: fixed; left: 12px; bottom: calc(16px + env(safe-area-inset-bottom));
+    background: rgba(15,23,42,0.55); backdrop-filter: blur(8px);
+    color: #cbd5e1; padding: 7px 12px; border-radius: 8px;
+    font-size: 12px; z-index: 120; border: 1px solid rgba(255,255,255,0.12);
+    transition: opacity .4s; max-width: 46vw;
+  }
+  #statusBox.fade { opacity: 0; pointer-events: none; }
+
+  /* ============ 地図モード：サイド動画パネル ============ */
+  #videoPanel {
+    position: fixed; top: 50%; right: 20px;
+    width: min(560px, 90vw);
+    background: var(--panel); backdrop-filter: blur(10px);
+    border-radius: var(--radius);
+    box-shadow: 0 24px 70px rgba(0,0,0,0.45);
+    overflow: hidden; display: none; z-index: 100;
+    transform: translateY(-50%);
+    transition: opacity .3s ease;
   }
   #videoPanel header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 14px 18px;
-    background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
-    color: white;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 13px 18px;
+    background: linear-gradient(135deg, var(--brand), var(--brand-dark)); color: #fff;
   }
   #videoPanel h2 {
-    margin: 0;
-    font-size: 1rem;
-    font-weight: 600;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    margin: 0; font-size: 1rem; font-weight: 700;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   #closeVideo {
-    width: 30px; height: 30px;
-    border: none; background: rgba(255,255,255,0.2); color: white;
-    border-radius: 50%; cursor: pointer; font-size: 20px;
-    display: flex; align-items: center; justify-content: center;
-    transition: background 0.2s;
+    width: 30px; height: 30px; flex: 0 0 auto; border: none;
+    background: rgba(255,255,255,0.22); color: #fff; border-radius: 50%;
+    cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center;
+    transition: background .2s;
   }
   #closeVideo:hover { background: rgba(255,255,255,0.4); }
-  .video-container { position: relative; width: 100%; padding-top: 56.25%; }
-  #videoFrame { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
+  .video-container { position: relative; width: 100%; padding-top: 56.25%; background: #000; }
+  #videoFrame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  #panelDesc {
+    margin: 0; padding: 10px 16px; font-size: 12.5px; color: #334155;
+    line-height: 1.6; max-height: 4.8em; overflow-y: auto;
+  }
+  #panelDesc:empty { display: none; }
 
   #connector { position: absolute; inset: 0; pointer-events: none; z-index: 50; display: none; width: 100%; height: 100%; }
-  .maplibregl-popup-content { font-size: 13px; padding: 8px 12px; }
-
-  /* ===== 追加：地図コントロール（航空写真・3D） ===== */
-  #mapControls {
-    position: fixed; top: 12px; left: 12px; z-index: 125;
-    display: flex; flex-direction: column; gap: 8px;
-  }
-  .map-ctrl-group {
-    display: flex; background: #fff; border-radius: 10px;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.18);
-    border: 1px solid #e2e8f0; overflow: hidden;
-  }
-  .map-ctrl-group button {
-    border: none; background: #fff;
-    padding: 8px 14px; font-size: 13px; font-weight: 600;
-    color: #475569; cursor: pointer; transition: background .2s, color .2s;
-  }
-  .map-ctrl-group button + button { border-left: 1px solid #e2e8f0; }
-  .map-ctrl-group button.active {
-    background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%); color: #fff;
+  .maplibregl-popup-content {
+    font-family: inherit; font-size: 13px; font-weight: 700;
+    padding: 8px 12px; border-radius: 10px;
   }
 
-  /* ===== 追加①：モード切り替えボタン（マップ ⇄ 動画） ===== */
-  #modeToggle {
-    position: fixed;
-    bottom: 24px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 130;
-    display: flex;
-    background: #fff;
-    border-radius: 999px;
-    box-shadow: 0 6px 22px rgba(0,0,0,0.22);
-    border: 1px solid #e2e8f0;
-    overflow: hidden;
-  }
-  #modeToggle button {
-    border: none; background: transparent;
-    padding: 11px 24px; font-size: 14px; font-weight: 600;
-    cursor: pointer; color: #64748b;
-    display: flex; align-items: center; gap: 7px;
-    transition: background .2s, color .2s;
-  }
-  #modeToggle button.active {
-    background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
-    color: #fff;
-  }
-
-  /* ===== 追加②：動画モード（ショート風）オーバーレイ ===== */
+  /* ============ 動画モード（ショート風） ============ */
   #feedOverlay {
-    position: fixed; inset: 0;
-    background: rgba(15,23,42,0.94);
-    z-index: 110;
-    display: none;
-    align-items: center; justify-content: center;
+    position: fixed; inset: 0; z-index: 200;
+    background: #000;
+    display: none; align-items: center; justify-content: center;
   }
   .feed-card {
-    width: min(390px, 94vw);
-    height: min(780px, 90vh);
-    background: #0f172a;
-    border-radius: 22px;
-    overflow: hidden;
+    width: min(420px, 100vw);
+    height: min(860px, 100dvh);
+    background: #000; position: relative; overflow: hidden;
     display: flex; flex-direction: column;
-    position: relative;
-    box-shadow: 0 24px 70px rgba(0,0,0,0.55);
   }
-  .feed-top {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 12px 14px; color: #fff;
-    background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
+  @media (min-width: 480px) and (min-height: 900px) {
+    .feed-card { border-radius: 24px; box-shadow: 0 30px 90px rgba(0,0,0,0.7); }
   }
-  .feed-top .left { display: flex; align-items: center; gap: 10px; min-width: 0; }
-  .feed-top .counter { font-size: 12px; opacity: .9; white-space: nowrap; }
-  .feed-icon-btn {
-    width: 32px; height: 32px; flex: 0 0 auto;
-    border: none; background: rgba(255,255,255,0.2); color: #fff;
-    border-radius: 50%; cursor: pointer; font-size: 16px;
-    display: flex; align-items: center; justify-content: center;
-    transition: background .2s;
-  }
-  .feed-icon-btn:hover { background: rgba(255,255,255,0.4); }
 
-  .feed-video { position: relative; width: 100%; flex: 1 1 auto; background: #000; min-height: 0; }
-  .feed-video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  .feed-video { position: relative; flex: 1 1 auto; min-height: 0; background: #000; }
+  #feedFrame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
 
-  /* 動画切り替えボタン（縦並び・右端） */
-  .feed-nav {
-    position: absolute; right: 12px; top: 50%;
-    transform: translateY(-50%);
-    display: flex; flex-direction: column; gap: 14px;
-    z-index: 3;
-  }
-  .feed-nav button {
-    width: 46px; height: 46px;
-    border: none; border-radius: 50%;
-    background: rgba(255,255,255,0.85); color: #1e293b;
-    font-size: 20px; cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
-    transition: transform .15s, background .2s;
-  }
-  .feed-nav button:hover { background: #fff; transform: scale(1.08); }
-  .feed-nav button:disabled { opacity: .35; cursor: default; transform: none; }
-  .feed-hint {
-    position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%);
-    color: rgba(255,255,255,0.7); font-size: 11px; z-index: 3;
+  /* 上部グラデーション＋戻る・カウンター */
+  .feed-topbar {
+    position: absolute; top: 0; left: 0; right: 0; z-index: 5;
+    display: flex; align-items: center; gap: 12px;
+    padding: calc(12px + env(safe-area-inset-top)) 14px 26px;
+    background: linear-gradient(rgba(0,0,0,0.55), transparent);
     pointer-events: none;
   }
-
-  /* 動画下の情報欄 */
-  .feed-info { padding: 12px 16px 8px; color: #fff; background: #0f172a; }
-  .feed-info .title { font-size: 1.05rem; font-weight: 700; margin: 0 0 4px; }
-  .feed-info .desc { font-size: 12.5px; color: #cbd5e1; margin: 0 0 6px; line-height: 1.5; max-height: 3em; overflow-y: auto; }
-  .feed-info .meta { font-size: 11px; color: #94a3b8; word-break: break-all; }
-  .feed-info .actions { display: flex; gap: 8px; margin-top: 10px; }
-  .feed-info .actions button {
-    flex: 1; border: none; border-radius: 10px;
-    padding: 9px 8px; font-size: 12.5px; font-weight: 600; cursor: pointer;
-    background: #1e293b; color: #e2e8f0;
-    transition: background .2s;
+  .feed-topbar > * { pointer-events: auto; }
+  .glass-icon {
+    width: 42px; height: 42px; border: 1px solid var(--glass-border);
+    background: var(--glass); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    color: #fff; border-radius: 50%; cursor: pointer; font-size: 18px;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .2s, transform .15s;
+    flex: 0 0 auto;
   }
-  .feed-info .actions button:hover { background: #334155; }
-  .feed-info .actions button.primary { background: #4a90e2; color: #fff; }
-  .feed-info .actions button.primary:hover { background: #357abd; }
+  .glass-icon:hover { background: rgba(255,255,255,0.28); transform: scale(1.06); }
+  .glass-icon:disabled { opacity: .35; transform: none; cursor: default; }
+  #feedCounter {
+    color: #fff; font-size: 13px; font-weight: 700;
+    background: var(--glass); border: 1px solid var(--glass-border);
+    backdrop-filter: blur(10px); padding: 6px 14px; border-radius: 999px;
+  }
 
-  /* フッタータブ（動画 / 再生履歴） */
-  .feed-tabs { display: flex; border-top: 1px solid #1e293b; }
+  /* 右側アクションレール（TikTok風） */
+  .feed-rail {
+    position: absolute; right: 10px; bottom: 120px; z-index: 5;
+    display: flex; flex-direction: column; align-items: center; gap: 16px;
+  }
+  .rail-item { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .rail-item .glass-icon { width: 48px; height: 48px; font-size: 20px; }
+  .rail-item small { color: #fff; font-size: 10.5px; font-weight: 700; text-shadow: 0 1px 4px rgba(0,0,0,.8); }
+  .rail-nav { display: flex; flex-direction: column; gap: 10px; margin-bottom: 6px; }
+
+  /* 下部情報（グラデーションの上に直接） */
+  .feed-bottom {
+    position: absolute; left: 0; right: 66px; bottom: 0; z-index: 4;
+    padding: 40px 16px 14px;
+    background: linear-gradient(transparent, rgba(0,0,0,0.75));
+    color: #fff; pointer-events: none;
+  }
+  .feed-bottom > * { pointer-events: auto; }
+  #feedTitle { margin: 0 0 4px; font-size: 1.05rem; font-weight: 900; text-shadow: 0 1px 6px rgba(0,0,0,.6); }
+  #feedDesc {
+    margin: 0; font-size: 12.5px; color: #e2e8f0; line-height: 1.55;
+    display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical;
+    overflow: hidden; cursor: pointer;
+  }
+  #feedDesc.open { -webkit-line-clamp: unset; max-height: 34vh; overflow-y: auto; }
+  #feedDesc:empty { display: none; }
+  #feedMeta { margin: 6px 0 0; font-size: 10.5px; color: #94a3b8; word-break: break-all; }
+  .swipe-hint {
+    position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%);
+    color: rgba(255,255,255,0.55); font-size: 10.5px; z-index: 4; pointer-events: none;
+    animation: hintFloat 2.2s ease-in-out infinite;
+  }
+  @keyframes hintFloat { 50% { transform: translateX(-50%) translateY(-4px); } }
+
+  /* タブ（動画 / 再生履歴） */
+  .feed-tabs {
+    flex: 0 0 auto; display: flex; z-index: 6;
+    background: #0b0f1a; border-top: 1px solid #1e293b;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
   .feed-tabs button {
-    flex: 1; border: none; background: #0f172a; color: #94a3b8;
-    padding: 12px 6px; font-size: 13px; font-weight: 600; cursor: pointer;
+    flex: 1; border: none; background: transparent; color: #64748b;
+    padding: 13px 6px; font-size: 13px; font-weight: 700; cursor: pointer;
+    font-family: inherit; position: relative;
   }
-  .feed-tabs button.active { color: #fff; border-top: 2px solid #4a90e2; margin-top: -1px; }
+  .feed-tabs button.active { color: #fff; }
+  .feed-tabs button.active::after {
+    content: ""; position: absolute; top: 0; left: 25%; right: 25%;
+    height: 2.5px; border-radius: 2px; background: var(--brand);
+  }
 
   /* 再生履歴ビュー */
-  .history-view { display: none; flex-direction: column; flex: 1 1 auto; min-height: 0; background: #0f172a; }
+  .history-view { position: absolute; inset: 0; bottom: 0; z-index: 5; background: #0b0f1a; display: none; flex-direction: column; }
   .history-view.show { display: flex; }
-  .history-view .scroll { overflow-y: auto; padding: 14px; }
-  .history-view h3 { color: #fff; font-size: 14px; margin: 0 0 10px; }
-  .history-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 18px; }
-  .history-thumb {
-    background: #1e293b; border-radius: 10px; overflow: hidden; cursor: pointer;
-    border: 1px solid #1e293b; transition: border-color .2s;
+  .history-head {
+    display: flex; align-items: center; gap: 12px;
+    padding: calc(12px + env(safe-area-inset-top)) 14px 12px;
   }
-  .history-thumb:hover { border-color: #4a90e2; }
+  .history-head h2 { margin: 0; color: #fff; font-size: 1.05rem; font-weight: 900; }
+  .history-scroll { flex: 1; overflow-y: auto; padding: 4px 14px 70px; }
+  .history-scroll h3 { color: #94a3b8; font-size: 12.5px; margin: 16px 0 10px; letter-spacing: .06em; }
+  .history-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .history-thumb {
+    background: #131a2a; border-radius: 12px; overflow: hidden; cursor: pointer;
+    border: 1px solid #1e293b; transition: border-color .2s, transform .15s;
+  }
+  .history-thumb:hover { border-color: var(--brand); transform: translateY(-2px); }
   .history-thumb img { width: 100%; display: block; aspect-ratio: 16/9; object-fit: cover; }
-  .history-thumb span { display: block; color: #cbd5e1; font-size: 11px; padding: 6px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .history-empty { color: #64748b; font-size: 13px; padding: 8px 0; }
+  .history-thumb span {
+    display: block; color: #cbd5e1; font-size: 11.5px; font-weight: 700;
+    padding: 7px 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .history-empty { color: #475569; font-size: 13px; }
 
-  /* トースト（コピー通知など） */
+  /* トースト */
   #toast {
-    position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%) translateY(20px);
-    background: rgba(15,23,42,0.95); color: #fff; padding: 10px 18px; border-radius: 999px;
-    font-size: 13px; z-index: 200; opacity: 0; pointer-events: none;
+    position: fixed; bottom: calc(96px + env(safe-area-inset-bottom)); left: 50%;
+    transform: translateX(-50%) translateY(16px);
+    background: rgba(15,23,42,0.95); color: #fff; padding: 10px 20px;
+    border-radius: 999px; border: 1px solid rgba(255,255,255,0.15);
+    font-size: 13px; font-weight: 700; z-index: 600;
+    opacity: 0; pointer-events: none;
     transition: opacity .25s, transform .25s;
   }
   #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (max-width: 640px) {
+    #videoPanel { top: auto; bottom: calc(84px + env(safe-area-inset-bottom)); right: 50%; transform: translateX(50%); }
+    #mapControls .glass-group button { padding: 9px 11px; font-size: 12px; }
+  }
 </style>
 </head>
 <body>
 
 <div id="map"></div>
-<div id="statusBox">読み込み中...</div>
 
-<!-- 地図コントロール：航空写真切り替え・3D -->
+<!-- ローディング画面 -->
+<div id="splash">
+  <div class="logo">yoh-map</div>
+  <div class="sub">REITAKU CAMPUS MAP</div>
+  <div class="loader"></div>
+  <div id="splashStatus">読み込み中...</div>
+</div>
+
+<!-- ブランドタグ -->
+<div id="brandTag">yoh<span>-</span>map</div>
+
+<!-- 地図コントロール -->
 <div id="mapControls">
-  <div class="map-ctrl-group">
-    <button id="layerMap" class="active">地図</button>
+  <div class="glass-group">
+    <button id="layerMap">地図</button>
+    <button id="layerSat" class="active">衛星</button>
     <button id="layerPhoto">航空写真</button>
   </div>
-  <div class="map-ctrl-group">
+  <div class="glass-group">
     <button id="btn3D">3D表示</button>
+    <button id="btnHome">🏠 全体表示</button>
   </div>
 </div>
 
-<!-- 矢印コネクター（地図モード用） -->
+<div id="statusBox">読み込み中...</div>
+
+<!-- 矢印コネクター -->
 <svg id="connector" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <marker id="arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
@@ -249,7 +321,7 @@
   <line id="connectorLine" x1="0" y1="0" x2="0" y2="0" stroke="#e74c3c" stroke-width="3" marker-end="url(#arrowhead)" stroke-linecap="round" stroke-dasharray="5,8" opacity="0.9" />
 </svg>
 
-<!-- 地図モード：サイド動画パネル -->
+<!-- 地図モード：サイドパネル -->
 <div id="videoPanel">
   <header>
     <h2 id="videoTitle">動画タイトル</h2>
@@ -258,58 +330,68 @@
   <div class="video-container">
     <iframe id="videoFrame" src="" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen></iframe>
   </div>
+  <p id="panelDesc"></p>
 </div>
 
-<!-- ===== 追加①：モード切り替えボタン ===== -->
-<div id="modeToggle">
+<!-- モード切り替え -->
+<div id="modeToggle" class="glass-group">
   <button id="btnMap" class="active">🗺 地図</button>
   <button id="btnFeed">▶ 動画</button>
 </div>
 
-<!-- ===== 追加②：動画モード（ショート風） ===== -->
+<!-- 動画モード（ショート風） -->
 <div id="feedOverlay">
   <div class="feed-card">
-    <div class="feed-top">
-      <div class="left">
-        <button class="feed-icon-btn" id="feedBack" title="地図に戻る">←</button>
-        <span class="counter" id="feedCounter">0 / 0</span>
-      </div>
-      <button class="feed-icon-btn" id="feedShare" title="公式URLをコピー">⤴</button>
-    </div>
+    <div class="feed-video" id="feedVideoArea">
+      <iframe id="feedFrame" src="" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen></iframe>
 
-    <!-- 動画ビュー -->
-    <div id="feedMain" style="display:flex; flex-direction:column; flex:1 1 auto; min-height:0;">
-      <div class="feed-video">
-        <iframe id="feedFrame" src="" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen></iframe>
-        <div class="feed-nav">
-          <button id="feedPrev" title="前の動画">▲</button>
-          <button id="feedNext" title="次の動画">▼</button>
-        </div>
-        <div class="feed-hint">スクロール・↑↓キーで切り替え</div>
+      <div class="feed-topbar">
+        <button class="glass-icon" id="feedBack" title="地図に戻る">←</button>
+        <span id="feedCounter">0 / 0</span>
       </div>
-      <div class="feed-info">
-        <p class="title" id="feedTitle">動画タイトル</p>
-        <p class="desc" id="feedDesc"></p>
-        <p class="meta" id="feedMeta">日付・座標・youtubeID</p>
-        <div class="actions">
-          <button class="primary" id="feedShowMap">📍 地図で見る</button>
-          <button id="feedOpen">▶ YouTubeで開く</button>
-          <button id="feedCopy">🔗 公式URLコピー</button>
+
+      <!-- 右レール：ナビ＋アクション -->
+      <div class="feed-rail">
+        <div class="rail-nav">
+          <button class="glass-icon" id="feedPrev" title="前の動画">▲</button>
+          <button class="glass-icon" id="feedNext" title="次の動画">▼</button>
+        </div>
+        <div class="rail-item">
+          <button class="glass-icon" id="feedShare" title="リンクをコピー">🔗</button>
+          <small>共有</small>
+        </div>
+        <div class="rail-item">
+          <button class="glass-icon" id="feedOpen" title="YouTubeで開く">▶</button>
+          <small>YouTube</small>
+        </div>
+        <div class="rail-item">
+          <button class="glass-icon" id="feedShowMap" title="地図で見る">📍</button>
+          <small>地図</small>
         </div>
       </div>
+
+      <div class="feed-bottom">
+        <p id="feedTitle">動画タイトル</p>
+        <p id="feedDesc"></p>
+        <p id="feedMeta"></p>
+      </div>
+      <div class="swipe-hint">▲▼ スワイプで切り替え</div>
     </div>
 
     <!-- 再生履歴ビュー -->
     <div class="history-view" id="historyView">
-      <div class="scroll">
-        <h3>再生履歴</h3>
+      <div class="history-head">
+        <button class="glass-icon" id="historyBack" title="動画へ戻る">←</button>
+        <h2>再生履歴</h2>
+      </div>
+      <div class="history-scroll">
+        <h3>▶ 再生した動画</h3>
         <div class="history-grid" id="historyGrid"></div>
-        <h3>動画一覧</h3>
+        <h3>🎬 すべての動画</h3>
         <div class="history-grid" id="allGrid"></div>
       </div>
     </div>
 
-    <!-- フッタータブ -->
     <div class="feed-tabs">
       <button id="tabVideo" class="active">動画</button>
       <button id="tabHistory">再生履歴</button>
@@ -321,7 +403,9 @@
 
 <script src="https://unpkg.com/maplibre-gl@4.7.0/dist/maplibre-gl.js"></script>
 <script>
-  // --- 1. 地図の初期化 (MapLibre仕様) ---
+  /* ============ 1. 地図初期化 ============ */
+  // 最初は日本全体の上空からスタート → データ読み込み後にキャンパスへ飛ぶ
+  const CAMPUS = [139.9554, 35.8332];
   const map = new maplibregl.Map({
     container: 'map',
     style: {
@@ -333,7 +417,12 @@
           tileSize: 256, maxzoom: 19,
           attribution: '© OpenStreetMap contributors'
         },
-        // 国土地理院 航空写真（日本全国・無料・APIキー不要）
+        esri: {
+          type: 'raster',
+          tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+          tileSize: 256, maxzoom: 19,
+          attribution: 'Tiles © Esri — Esri, Maxar, Earthstar Geographics'
+        },
         gsiphoto: {
           type: 'raster',
           tiles: ['https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg'],
@@ -342,62 +431,37 @@
         }
       },
       layers: [
-        { id: 'osm',      type: 'raster', source: 'osm',      layout: { visibility: 'visible' } },
+        { id: 'osm',      type: 'raster', source: 'osm',      layout: { visibility: 'none' } },
+        { id: 'esri',     type: 'raster', source: 'esri',     layout: { visibility: 'visible' } },
         { id: 'gsiphoto', type: 'raster', source: 'gsiphoto', layout: { visibility: 'none' } }
       ]
     },
-    center: [139.9554, 35.8332], // [経度(lng), 緯度(lat)]
-    zoom: 16, minZoom: 15, maxZoom: 19
+    center: [137.5, 37.5],   // 日本全体
+    zoom: 4.2,
+    minZoom: 2,              // 世界レベルまでズームアウト可能
+    maxZoom: 19
   });
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }));
 
-  // --- 地図コントロール：航空写真切り替え ---
-  const layerMap = document.getElementById('layerMap');
-  const layerPhoto = document.getElementById('layerPhoto');
-  const btn3D = document.getElementById('btn3D');
-  const mapControls = document.getElementById('mapControls');
-
-  function setBaseLayer(key) {
-    const photo = key === 'photo';
-    map.setLayoutProperty('osm', 'visibility', photo ? 'none' : 'visible');
-    map.setLayoutProperty('gsiphoto', 'visibility', photo ? 'visible' : 'none');
-    layerPhoto.classList.toggle('active', photo);
-    layerMap.classList.toggle('active', !photo);
-  }
-  layerMap.addEventListener('click', () => setBaseLayer('map'));
-  layerPhoto.addEventListener('click', () => setBaseLayer('photo'));
-
-  // --- 3D（地図を傾けて立体表示） ---
-  let is3D = false;
-  function toggle3D() {
-    is3D = !is3D;
-    map.easeTo({ pitch: is3D ? 60 : 0, bearing: is3D ? -20 : 0, duration: 600 });
-    btn3D.classList.toggle('active', is3D);
-    btn3D.textContent = is3D ? '2Dに戻す' : '3D表示';
-  }
-  btn3D.addEventListener('click', toggle3D);
-
-  // --- 2. 画面要素の取得と変数定義 ---
-  const panel = document.getElementById("videoPanel");
-  const title = document.getElementById("videoTitle");
-  const iframe = document.getElementById("videoFrame");
-  const closeBtn = document.getElementById("closeVideo");
-  const connector = document.getElementById("connector");
-  const connectorLine = document.getElementById("connectorLine");
-  const mapElement = document.getElementById("map");
+  /* ============ 2. 要素・状態 ============ */
+  const $ = id => document.getElementById(id);
+  const panel = $('videoPanel'), title = $('videoTitle'), iframe = $('videoFrame');
+  const panelDesc = $('panelDesc');
+  const connector = $('connector'), connectorLine = $('connectorLine'), mapElement = $('map');
+  const splash = $('splash'), splashStatus = $('splashStatus');
 
   let activeMarker = null;
-  let videoData = [];   // {title, lat, lng, youtubeId, marker}
-  let watchedIds = [];  // 再生履歴（IDの並び・新しい順）※メモリ内のみ
+  let videoData = [];
+  let watchedIds = [];
+  let markersBounds = null;
 
   const SHEET_ID = '172EjAWId_IgXCqYVE-1OShEyka6SF7xOSbxCSqWrbqM';
   const GID = 0;
 
   const hoverPopup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: [0, -35] });
 
-  // --- 3. スプレッドシート連携ロジック ---
+  /* ============ 3. スプレッドシート読み込み ============ */
   function findColumnIndex(cols, names) {
-    names = Array.isArray(names) ? names : [names];
     for (let i = 0; i < cols.length; i++) {
       const label = (cols[i].label || '').toString().toLowerCase().trim();
       for (const n of names) if (label === n) return i;
@@ -409,23 +473,22 @@
     return -1;
   }
 
-  // YouTube IDを正規化（IDそのまま / 通常URL / youtu.be / Shorts いずれにも対応）
   function extractYouTubeId(v) {
     let s = String(v).trim();
     if (!s) return null;
-    if (/^[\w-]{11}$/.test(s)) return s;                          // 既に11文字のID
+    if (/^[\w-]{11}$/.test(s)) return s;
     const m = s.match(/(?:youtu\.be\/|[?&]v=|embed\/|shorts\/)([\w-]{11})/);
-    return m ? m[1] : s;                                          // 取れなければそのまま
+    return m ? m[1] : s;
   }
 
   async function loadSheetData() {
     const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${GID}`;
     try {
-      updateStatus('シートを取得中...');
+      setStatus('データを取得中...');
       const res = await fetch(url);
       const text = await res.text();
       const m = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\);/);
-      if (!m) throw new Error('予期しないレスポンス形式');
+      if (!m) throw new Error('unexpected response');
 
       const json = JSON.parse(m[1]);
       const cols = json.table.cols || [];
@@ -433,63 +496,100 @@
 
       const idxLat = findColumnIndex(cols, ['lat', 'latitude', '緯度']);
       const idxLon = findColumnIndex(cols, ['lon', 'lng', 'long', 'longitude', '経度']);
-      // ※ 'id' 単体はA列(連番ID)と誤マッチするため候補から除外
       const idxYt = findColumnIndex(cols, ['youtubeid', 'youtube id', 'youtube', 'videoid']);
       const idxTitle = findColumnIndex(cols, ['title', 'タイトル']);
       const idxDesc = findColumnIndex(cols, ['description', '概要', '説明']);
 
       if (idxLat < 0 || idxLon < 0 || idxYt < 0) {
-        updateStatus('列が見つかりません: lat/lon/youtubeID を確認してください');
-        return;
-      }
-
-      videoData = rows.map(r => {
-        const c = r.c || [];
-        const lat = c[idxLat] && c[idxLat].v != null ? parseFloat(c[idxLat].v) : null;
-        const lng = c[idxLon] && c[idxLon].v != null ? parseFloat(c[idxLon].v) : null;
-        const youtubeId = idxYt >= 0 && c[idxYt] && c[idxYt].v != null ? extractYouTubeId(c[idxYt].v) : null;
-        const t = idxTitle >= 0 && c[idxTitle] && c[idxTitle].v != null ? String(c[idxTitle].v) : (youtubeId || '');
-        const desc = idxDesc >= 0 && c[idxDesc] && c[idxDesc].v != null ? String(c[idxDesc].v) : '';
-        return { title: t, lat, lng, youtubeId, description: desc };
-      }).filter(d => d.lat !== null && d.lng !== null && d.youtubeId);
-
-      if (videoData.length) {
-        videoData.forEach(data => createMarkerFromData(data));
-        updateStatus(`読み込み完了: ${videoData.length} 件`);
-      } else {
-        updateStatus('有効なデータなし。デモを表示します');
+        setStatus('列が見つかりません（lat/lon/youtubeID）');
         useFallbackData();
+      } else {
+        videoData = rows.map(r => {
+          const c = r.c || [];
+          const lat = c[idxLat] && c[idxLat].v != null ? parseFloat(c[idxLat].v) : null;
+          const lng = c[idxLon] && c[idxLon].v != null ? parseFloat(c[idxLon].v) : null;
+          const youtubeId = c[idxYt] && c[idxYt].v != null ? extractYouTubeId(c[idxYt].v) : null;
+          const t = idxTitle >= 0 && c[idxTitle] && c[idxTitle].v != null ? String(c[idxTitle].v) : (youtubeId || '');
+          const desc = idxDesc >= 0 && c[idxDesc] && c[idxDesc].v != null ? String(c[idxDesc].v) : '';
+          return { title: t, lat, lng, youtubeId, description: desc };
+        }).filter(d => d.lat !== null && d.lng !== null && d.youtubeId);
+
+        if (videoData.length) {
+          videoData.forEach(d => createMarkerFromData(d));
+          setStatus(`${videoData.length} 件のスポットを読み込みました`);
+        } else {
+          setStatus('有効なデータなし。デモを表示します');
+          useFallbackData();
+        }
       }
     } catch (e) {
-      console.error('スプレッドシート読み込みエラー', e);
-      updateStatus('読み込み失敗。デモを表示します');
+      console.error(e);
+      setStatus('シートを読めませんでした。デモを表示します');
       useFallbackData();
     }
+
     buildAllGrid();
+    computeBounds();
+    playIntro();       // ← 上空からキャンパスへズームイン演出
   }
 
-  // --- 4. マーカー作成関数 (MapLibre仕様) ---
+  function useFallbackData(){
+    const fallback = [
+      { title: 'さつき (デモ)', lat: 35.83364, lng: 139.95635, youtubeId: 'JjwVpOU_bFo', description: 'デモ用の動画です' },
+      { title: 'ひいらぎ (デモ)', lat: 35.83430, lng: 139.95535, youtubeId: 'dQw4w9WgXcQ', description: '' },
+      { title: 'けやき (デモ)', lat: 35.83290, lng: 139.95480, youtubeId: 'M7lc1UVf-VE', description: '' }
+    ];
+    fallback.forEach(d => { videoData.push(d); createMarkerFromData(d); });
+  }
+
+  function computeBounds() {
+    if (!videoData.length) return;
+    markersBounds = new maplibregl.LngLatBounds();
+    videoData.forEach(d => markersBounds.extend([d.lng, d.lat]));
+  }
+
+  /* ============ 4. イントロ演出 ============ */
+  function playIntro() {
+    // スプラッシュを閉じてから、上空 → 全マーカーが収まる位置へフライト
+    setTimeout(() => splash.classList.add('hide'), 400);
+    setTimeout(() => {
+      if (markersBounds) {
+        map.fitBounds(markersBounds, {
+          padding: 90, maxZoom: 17,
+          duration: 3400, curve: 1.55, essential: true
+        });
+      } else {
+        map.flyTo({ center: CAMPUS, zoom: 16, duration: 3400, curve: 1.55, essential: true });
+      }
+    }, 900);
+    setTimeout(() => $('statusBox').classList.add('fade'), 6000);
+  }
+
+  // 全体表示ボタン（いつでも初期ビューに戻れる）
+  $('btnHome').addEventListener('click', () => {
+    if (markersBounds) map.fitBounds(markersBounds, { padding: 90, maxZoom: 17, duration: 1200 });
+  });
+
+  /* ============ 5. マーカー ============ */
   function createMarkerFromData(data) {
     const marker = new maplibregl.Marker({ color: "#4a90e2" })
       .setLngLat([data.lng, data.lat])
       .addTo(map);
     data.marker = marker;
 
-    const markerEl = marker.getElement();
-    markerEl.style.cursor = 'pointer';
-
-    markerEl.addEventListener('mouseenter', () => {
+    const el = marker.getElement();
+    el.style.cursor = 'pointer';
+    el.addEventListener('mouseenter', () => {
       hoverPopup.setLngLat([data.lng, data.lat]).setHTML(`<b>${data.title}</b>`).addTo(map);
     });
-    markerEl.addEventListener('mouseleave', () => hoverPopup.remove());
-
-    // クリック：地図モードのサイドパネルを開く
-    markerEl.addEventListener('click', () => openSidePanel(data, marker));
+    el.addEventListener('mouseleave', () => hoverPopup.remove());
+    el.addEventListener('click', () => openSidePanel(data, marker));
   }
 
   function openSidePanel(data, marker) {
     activeMarker = marker;
     title.textContent = data.title || '動画';
+    panelDesc.textContent = data.description || '';
     iframe.src = `https://www.youtube.com/embed/${data.youtubeId}?autoplay=1&rel=0&modestbranding=1&playsinline=1`;
     panel.style.display = "block";
     panel.style.opacity = 0;
@@ -500,22 +600,7 @@
     pushHistory(data.youtubeId);
   }
 
-  function useFallbackData(){
-    const fallback = [
-      { title: 'さつき (デモ)', lat: 35.83364, lng: 139.95635, youtubeId: 'JjwVpOU_bFo' },
-      { title: 'ひいらぎ (デモ)', lat: 35.83430, lng: 139.95535, youtubeId: 'dQw4w9WgXcQ' },
-      { title: 'けやき (デモ)', lat: 35.83290, lng: 139.95480, youtubeId: 'M7lc1UVf-VE' }
-    ];
-    fallback.forEach(d => { videoData.push(d); createMarkerFromData(d); });
-  }
-
-  function updateStatus(msg){
-    const s = document.getElementById('statusBox');
-    if (s) s.textContent = msg;
-  }
-
-  // --- 5. UI制御 & コネクター（地図モード） ---
-  closeBtn.addEventListener("click", closeVideo);
+  $('closeVideo').addEventListener("click", closeVideo);
   function closeVideo() {
     panel.style.opacity = 0;
     setTimeout(() => {
@@ -528,105 +613,112 @@
 
   function updateConnector() {
     if (!activeMarker || panel.style.display === "none") return;
-    const pinPoint = map.project(activeMarker.getLngLat());
-    const panelRect = panel.getBoundingClientRect();
-    const mapRect = mapElement.getBoundingClientRect();
-    connectorLine.setAttribute("x1", pinPoint.x);
-    connectorLine.setAttribute("y1", pinPoint.y - 15);
-    connectorLine.setAttribute("x2", panelRect.left - mapRect.left);
-    connectorLine.setAttribute("y2", panelRect.top - mapRect.top + panelRect.height / 2);
+    const pin = map.project(activeMarker.getLngLat());
+    const pr = panel.getBoundingClientRect();
+    const mr = mapElement.getBoundingClientRect();
+    connectorLine.setAttribute("x1", pin.x);
+    connectorLine.setAttribute("y1", pin.y - 15);
+    connectorLine.setAttribute("x2", pr.left - mr.left + (pr.left > pin.x ? 0 : pr.width));
+    connectorLine.setAttribute("y2", pr.top - mr.top + pr.height / 2);
   }
-
-  map.on('load', loadSheetData);
   map.on('move', updateConnector);
   window.addEventListener("resize", updateConnector);
+  map.on('load', loadSheetData);
 
-  /* ============================================================
-     追加機能：モード切り替え（マップ⇄動画）＋ 動画切り替え
-     ============================================================ */
-  const btnMap = document.getElementById('btnMap');
-  const btnFeed = document.getElementById('btnFeed');
-  const modeToggle = document.getElementById('modeToggle');
-  const feedOverlay = document.getElementById('feedOverlay');
-  const feedFrame = document.getElementById('feedFrame');
-  const feedTitle = document.getElementById('feedTitle');
-  const feedDesc = document.getElementById('feedDesc');
-  const feedMeta = document.getElementById('feedMeta');
-  const feedCounter = document.getElementById('feedCounter');
-  const feedPrev = document.getElementById('feedPrev');
-  const feedNext = document.getElementById('feedNext');
-  const feedBack = document.getElementById('feedBack');
-  const feedShare = document.getElementById('feedShare');
-  const feedCopy = document.getElementById('feedCopy');
-  const feedOpen = document.getElementById('feedOpen');
-  const feedShowMap = document.getElementById('feedShowMap');
-  const tabVideo = document.getElementById('tabVideo');
-  const tabHistory = document.getElementById('tabHistory');
-  const feedMain = document.getElementById('feedMain');
-  const historyView = document.getElementById('historyView');
-  const historyGrid = document.getElementById('historyGrid');
-  const allGrid = document.getElementById('allGrid');
+  /* ============ 6. ベースマップ切り替え・3D ============ */
+  const layerMap = $('layerMap'), layerSat = $('layerSat'), layerPhoto = $('layerPhoto');
+  const BASE_LAYER_IDS = ['osm', 'esri', 'gsiphoto'];
+  function setBaseLayer(key) {
+    const target = key === 'osm' ? 'osm' : key === 'sat' ? 'esri' : 'gsiphoto';
+    BASE_LAYER_IDS.forEach(id => map.setLayoutProperty(id, 'visibility', id === target ? 'visible' : 'none'));
+    layerMap.classList.toggle('active', key === 'osm');
+    layerSat.classList.toggle('active', key === 'sat');
+    layerPhoto.classList.toggle('active', key === 'photo');
+  }
+  layerMap.addEventListener('click', () => setBaseLayer('osm'));
+  layerSat.addEventListener('click', () => setBaseLayer('sat'));
+  layerPhoto.addEventListener('click', () => setBaseLayer('photo'));
 
+  const btn3D = $('btn3D');
+  let is3D = false;
+  btn3D.addEventListener('click', () => {
+    is3D = !is3D;
+    map.easeTo({ pitch: is3D ? 60 : 0, bearing: is3D ? -20 : 0, duration: 600 });
+    btn3D.classList.toggle('active', is3D);
+    btn3D.textContent = is3D ? '2Dに戻す' : '3D表示';
+  });
+
+  /* ============ 7. モード切り替え（地図⇄動画） ============ */
+  const btnMap = $('btnMap'), btnFeed = $('btnFeed');
+  const modeToggle = $('modeToggle'), mapControls = $('mapControls'), brandTag = $('brandTag');
+  const feedOverlay = $('feedOverlay'), feedFrame = $('feedFrame');
   let feedIndex = 0;
 
-  // --- モード切り替え ---
   function setMode(mode) {
-    if (mode === 'feed') {
-      if (!videoData.length) { showToast('動画データがまだありません'); return; }
-      btnFeed.classList.add('active');
-      btnMap.classList.remove('active');
-      feedOverlay.style.display = 'flex';
-      modeToggle.style.display = 'none';   // 重なり防止：フィードのタブと被らないよう隠す
-      mapControls.style.display = 'none';
-      closeVideo();              // 地図用パネルは閉じる
-      showFeed(feedIndex);       // 現在位置の動画を表示
-    } else {
-      btnMap.classList.add('active');
-      btnFeed.classList.remove('active');
-      feedOverlay.style.display = 'none';
-      modeToggle.style.display = 'flex';
-      mapControls.style.display = 'flex';
-      feedFrame.src = '';        // 再生停止
-      showVideoTab();            // タブを動画側に戻しておく
-    }
+    const feed = mode === 'feed';
+    if (feed && !videoData.length) { showToast('動画データがまだありません'); return; }
+    btnFeed.classList.toggle('active', feed);
+    btnMap.classList.toggle('active', !feed);
+    feedOverlay.style.display = feed ? 'flex' : 'none';
+    modeToggle.style.display = feed ? 'none' : 'flex';
+    mapControls.style.display = feed ? 'none' : 'flex';
+    brandTag.style.display = feed ? 'none' : 'block';
+    if (feed) { closeVideo(); showFeed(feedIndex); }
+    else { feedFrame.src = ''; showVideoTab(); }
   }
   btnMap.addEventListener('click', () => setMode('map'));
   btnFeed.addEventListener('click', () => setMode('feed'));
-  feedBack.addEventListener('click', () => setMode('map'));
+  $('feedBack').addEventListener('click', () => setMode('map'));
 
-  // --- 動画の表示 ---
+  /* ============ 8. フィード表示・切り替え ============ */
+  const feedTitle = $('feedTitle'), feedDesc = $('feedDesc'), feedMeta = $('feedMeta'), feedCounter = $('feedCounter');
+
   function showFeed(i) {
     if (!videoData.length) return;
-    feedIndex = (i + videoData.length) % videoData.length; // 端でループ
+    feedIndex = (i + videoData.length) % videoData.length;
     const d = videoData[feedIndex];
     feedFrame.src = `https://www.youtube.com/embed/${d.youtubeId}?autoplay=1&rel=0&modestbranding=1&playsinline=1`;
     feedTitle.textContent = d.title || '動画';
     feedDesc.textContent = d.description || '';
-    feedMeta.textContent = `座標: ${d.lat.toFixed(5)}, ${d.lng.toFixed(5)} ／ youtubeID: ${d.youtubeId}`;
+    feedDesc.classList.remove('open');
+    feedMeta.textContent = `📍 ${d.lat.toFixed(5)}, ${d.lng.toFixed(5)}`;
     feedCounter.textContent = `${feedIndex + 1} / ${videoData.length}`;
     showVideoTab();
     pushHistory(d.youtubeId);
   }
+  const nextVideo = () => showFeed(feedIndex + 1);
+  const prevVideo = () => showFeed(feedIndex - 1);
+  $('feedNext').addEventListener('click', nextVideo);
+  $('feedPrev').addEventListener('click', prevVideo);
 
-  // --- 動画切り替えボタン ---
-  function nextVideo() { showFeed(feedIndex + 1); }
-  function prevVideo() { showFeed(feedIndex - 1); }
-  feedNext.addEventListener('click', nextVideo);
-  feedPrev.addEventListener('click', prevVideo);
+  // 概要はタップで展開
+  feedDesc.addEventListener('click', () => feedDesc.classList.toggle('open'));
 
-  // スクロール（ホイール）で切り替え
+  // ホイールで切り替え
   let wheelLock = false;
   feedOverlay.addEventListener('wheel', (e) => {
     if (feedOverlay.style.display === 'none') return;
-    if (historyView.classList.contains('show')) return; // 履歴表示中はスクロール無効化
+    if ($('historyView').classList.contains('show')) return;
     e.preventDefault();
     if (wheelLock) return;
     wheelLock = true;
-    if (e.deltaY > 0) nextVideo(); else prevVideo();
+    e.deltaY > 0 ? nextVideo() : prevVideo();
     setTimeout(() => wheelLock = false, 600);
   }, { passive: false });
 
-  // 矢印キーで切り替え / Escで閉じる
+  // スマホ：上下スワイプで切り替え
+  let touchY = null;
+  const videoArea = $('feedVideoArea');
+  videoArea.addEventListener('touchstart', e => { touchY = e.touches[0].clientY; }, { passive: true });
+  videoArea.addEventListener('touchend', e => {
+    if (touchY === null) return;
+    const dy = e.changedTouches[0].clientY - touchY;
+    touchY = null;
+    if (Math.abs(dy) < 55) return;   // 誤タップ防止
+    dy < 0 ? nextVideo() : prevVideo();
+  }, { passive: true });
+
+  // キーボード
   window.addEventListener('keydown', (e) => {
     if (feedOverlay.style.display === 'none') return;
     if (e.key === 'ArrowDown') { e.preventDefault(); nextVideo(); }
@@ -634,52 +726,49 @@
     else if (e.key === 'Escape') setMode('map');
   });
 
-  // --- 「地図で見る」：その動画の場所へ移動して地図モードへ ---
-  feedShowMap.addEventListener('click', () => {
-    const d = videoData[feedIndex];
-    setMode('map');
-    if (d.marker) openSidePanel(d, d.marker);
-    map.flyTo({ center: [d.lng, d.lat], zoom: 18 });
-  });
-
-  // --- 共有（公式URLコピー） ---
-  function copyUrl() {
+  /* ============ 9. アクション（共有・YouTube・地図） ============ */
+  $('feedShare').addEventListener('click', () => {
     const d = videoData[feedIndex];
     const url = `https://www.youtube.com/watch?v=${d.youtubeId}`;
-    navigator.clipboard?.writeText(url)
-      .then(() => showToast('公式URLをコピーしました'))
-      .catch(() => showToast(url));
-  }
-  feedShare.addEventListener('click', copyUrl);
-  feedCopy.addEventListener('click', copyUrl);
+    if (navigator.share) {
+      navigator.share({ title: d.title, url }).catch(() => {});
+    } else {
+      navigator.clipboard?.writeText(url)
+        .then(() => showToast('リンクをコピーしました 🔗'))
+        .catch(() => showToast(url));
+    }
+  });
 
-  // --- YouTubeで開く（埋め込み再生できない動画用のフォールバック） ---
-  feedOpen.addEventListener('click', () => {
+  $('feedOpen').addEventListener('click', () => {
     const d = videoData[feedIndex];
     window.open(`https://www.youtube.com/watch?v=${d.youtubeId}`, '_blank');
   });
 
-  // --- タブ：動画 / 再生履歴 ---
+  $('feedShowMap').addEventListener('click', () => {
+    const d = videoData[feedIndex];
+    setMode('map');
+    map.flyTo({ center: [d.lng, d.lat], zoom: 18, duration: 1600, curve: 1.4 });
+    if (d.marker) setTimeout(() => openSidePanel(d, d.marker), 1600);
+  });
+
+  /* ============ 10. タブ・再生履歴 ============ */
+  const tabVideo = $('tabVideo'), tabHistory = $('tabHistory'), historyView = $('historyView');
   function showVideoTab() {
-    tabVideo.classList.add('active');
-    tabHistory.classList.remove('active');
-    feedMain.style.display = 'flex';
+    tabVideo.classList.add('active'); tabHistory.classList.remove('active');
     historyView.classList.remove('show');
   }
   function showHistoryTab() {
-    tabHistory.classList.add('active');
-    tabVideo.classList.remove('active');
-    feedMain.style.display = 'none';
+    tabHistory.classList.add('active'); tabVideo.classList.remove('active');
     historyView.classList.add('show');
     buildHistoryGrid();
   }
   tabVideo.addEventListener('click', showVideoTab);
   tabHistory.addEventListener('click', showHistoryTab);
+  $('historyBack').addEventListener('click', showVideoTab);
 
-  // --- 再生履歴の管理（メモリ内） ---
   function pushHistory(id) {
-    watchedIds = watchedIds.filter(x => x !== id); // 重複除去
-    watchedIds.unshift(id);                        // 先頭に追加
+    watchedIds = watchedIds.filter(x => x !== id);
+    watchedIds.unshift(id);
     if (watchedIds.length > 30) watchedIds.pop();
   }
 
@@ -689,43 +778,38 @@
       <span>${d.title || d.youtubeId}</span>
     </div>`;
   }
-
   function buildHistoryGrid() {
-    const items = watchedIds
-      .map(id => videoData.find(d => d.youtubeId === id))
-      .filter(Boolean);
-    historyGrid.innerHTML = items.length
-      ? items.map(thumbHtml).join('')
-      : '<p class="history-empty">まだ再生した動画はありません</p>';
-    bindThumbClicks(historyGrid);
+    const items = watchedIds.map(id => videoData.find(d => d.youtubeId === id)).filter(Boolean);
+    $('historyGrid').innerHTML = items.length ? items.map(thumbHtml).join('') : '<p class="history-empty">まだ再生した動画はありません</p>';
+    bindThumbs($('historyGrid'));
   }
-
   function buildAllGrid() {
-    allGrid.innerHTML = videoData.map(thumbHtml).join('');
-    bindThumbClicks(allGrid);
+    $('allGrid').innerHTML = videoData.map(thumbHtml).join('');
+    bindThumbs($('allGrid'));
   }
-
-  function bindThumbClicks(container) {
-    container.querySelectorAll('.history-thumb').forEach(el => {
+  function bindThumbs(box) {
+    box.querySelectorAll('.history-thumb').forEach(el => {
       el.addEventListener('click', () => {
-        const id = el.getAttribute('data-id');
-        const i = videoData.findIndex(d => d.youtubeId === id);
+        const i = videoData.findIndex(d => d.youtubeId === el.dataset.id);
         if (i >= 0) showFeed(i);
       });
     });
   }
 
-  // --- トースト通知 ---
+  /* ============ 11. 共通UI ============ */
+  function setStatus(msg) {
+    $('statusBox').textContent = msg;
+    splashStatus.textContent = msg;
+  }
   let toastTimer = null;
   function showToast(msg) {
-    const t = document.getElementById('toast');
+    const t = $('toast');
     t.textContent = msg;
     t.classList.add('show');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => t.classList.remove('show'), 2000);
   }
 
-  // デバッグ用
   window.reloadSheet = loadSheetData;
 </script>
 </body>
