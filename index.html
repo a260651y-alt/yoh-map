@@ -87,6 +87,11 @@
   .rbtn:hover { color: var(--green-deep); border-color: var(--green); }
   .mini-vid { position: relative; width: 100%; aspect-ratio: 16/9; background: #000; }
   #miniFrame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+
+  /* 縦動画（メンバー紹介）のときは横の黒帯が出ないよう縦長にする。
+     画面の高さを超えないよう、幅を vh からも計算して小さいほうを採用 */
+  #mini.shorts { width: min(320px, 80vw, calc((100vh - 230px) * 0.5625)); }
+  #mini.shorts .mini-vid { aspect-ratio: 9/16; }
   #miniDesc { margin: 0; padding: 10px 16px; font-size: 12.5px; color: #4a544f; line-height: 1.6; max-height: 5em; overflow-y: auto; }
   #miniDesc:empty { display: none; }
   .mini-foot { display: flex; gap: 8px; padding: 0 14px 14px; }
@@ -276,7 +281,9 @@
     <h2 id="miniTitle">動画タイトル</h2>
     <button class="rbtn" id="miniClose"><svg class="ic" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
   </div>
-  <div class="mini-vid"><iframe id="miniFrame" src="" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen></iframe></div>
+  <div class="mini-vid">
+    <iframe id="miniFrame" src="" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen></iframe>
+  </div>
   <p id="miniDesc"></p>
   <div class="mini-foot">
     <button class="chip primary" id="miniToVideo"><svg class="ic" viewBox="0 0 24 24"><path d="m9 7 8 5-8 5V7Z"/></svg>動画モードで見る</button>
@@ -407,7 +414,9 @@
         const title = val(iTtl) || id || `スポット ${n + 1}`;
         const desc = val(iDsc);
         const type = val(iTyp).toLowerCase();
-        const shorts = FORCED_SHORTS.includes(id) || type.includes('short') || type.includes('縦')
+        // メンバー紹介（JUMP_IDS）は縦動画なので必ず縦型扱いにする
+        const shorts = JUMP_IDS.includes(rowId) || FORCED_SHORTS.includes(id)
+          || type.includes('short') || type.includes('縦')
           || /short|ショート|縦/i.test(`${title} ${desc}`);
         // メンバーのスポット（JUMP_IDS）だけ「次のメンバーへ」ボタンを出す
         const hasJump = JUMP_IDS.includes(rowId);
@@ -625,6 +634,8 @@
     const d = videoData[i];
     $('miniTitle').textContent = d.title;
     $('miniDesc').textContent = d.desc || '';
+    // 縦動画なら枠を縦長に
+    mini.classList.toggle('shorts', !!d.shorts);
     $('miniFrame').src = embed(d.id);
     $('miniJump').style.display = d.hasJump ? '' : 'none';
     mini.classList.add('show');
