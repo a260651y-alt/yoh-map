@@ -34,8 +34,46 @@
   .seg button.active { background: var(--green-soft); color: var(--green-deep); }
   .fab { display: flex; align-items: center; gap: 6px; background: var(--surface); border: none; border-radius: 999px; box-shadow: var(--shadow); padding: 10px 15px; font-size: 12.5px; font-weight: 700; cursor: pointer; transition: background .18s, color .18s; }
   .fab.active { background: var(--green); color: #fff; }
-  #status { position: fixed; top: calc(66px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); background: var(--surface); box-shadow: var(--shadow); color: var(--muted); padding: 7px 14px; border-radius: 999px; font-size: 12px; z-index: 118; transition: opacity .4s; white-space: nowrap; }
+  #status { position: fixed; top: calc(116px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); background: var(--surface); box-shadow: var(--shadow); color: var(--muted); padding: 7px 14px; border-radius: 999px; font-size: 12px; z-index: 118; transition: opacity .4s; white-space: nowrap; }
   #status.fade { opacity: 0; pointer-events: none; }
+
+  /* ===== スポット一覧（地図モード） ===== */
+  #searchWrap { position: fixed; top: calc(64px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); width: min(440px, calc(100% - 24px)); z-index: 130; }
+  body.vmode #searchWrap { display: none; }
+  #listBtn { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; background: var(--surface); border: none; border-radius: 999px; box-shadow: var(--shadow); padding: 12px 16px; font-family: var(--round); font-weight: 800; font-size: 14px; color: var(--ink); cursor: pointer; }
+  #listBtn .ic { width: 18px; height: 18px; color: var(--green); }
+  #listBtn .chev { width: 16px; height: 16px; color: var(--muted); transition: transform .2s; }
+  #listBtn.open .chev { transform: rotate(180deg); }
+  #searchResults { margin-top: 8px; background: var(--surface); border-radius: 16px; box-shadow: var(--shadow-l); overflow: hidden; display: none; }
+  #searchResults.show { display: block; }
+  .sr-scroll { max-height: 56vh; overflow-y: auto; }
+  .sr-group-label { padding: 10px 16px 4px; font-family: var(--round); font-weight: 800; font-size: 11.5px; color: var(--muted); letter-spacing: .04em; background: #f7f9f7; }
+  .sr-item { display: flex; align-items: center; gap: 12px; padding: 11px 16px; cursor: pointer; border-bottom: 1px solid var(--line); transition: background .15s; }
+  .sr-item:last-child { border-bottom: none; }
+  .sr-item:hover { background: var(--green-soft); }
+  .sr-thumb { width: 52px; height: 36px; border-radius: 8px; background: #ddd center/cover no-repeat; flex: 0 0 auto; }
+  .sr-text { flex: 1; min-width: 0; }
+  .sr-title { font-family: var(--round); font-weight: 800; font-size: 13.5px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sr-place { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sr-go { flex: 0 0 auto; display: flex; align-items: center; gap: 4px; background: var(--green); color: #fff; border: none; border-radius: 999px; padding: 6px 12px; font-family: var(--round); font-weight: 800; font-size: 12px; cursor: pointer; }
+  .sr-go .ic { width: 13px; height: 13px; }
+
+  /* ===== グループ表示切替（検索バーの下） ===== */
+  #groupBar { display: flex; gap: 8px; margin-top: 8px; justify-content: center; }
+  body.vmode #groupBar { display: none; }
+  .group-chip { display: flex; align-items: center; gap: 6px; background: var(--surface); border: 1.5px solid var(--line); border-radius: 999px; box-shadow: var(--shadow); padding: 7px 14px; font-family: var(--round); font-weight: 800; font-size: 12.5px; color: var(--ink); cursor: pointer; transition: all .15s; user-select: none; }
+  .group-chip .dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
+  .group-chip[data-g="campus"] .dot { background: var(--green); }
+  .group-chip[data-g="member"] .dot { background: #e8892b; }
+  .group-chip.off { background: #f0f2f0; color: #aab2ad; border-color: transparent; }
+  .group-chip.off .dot { opacity: .3; }
+
+  /* ===== 現在地ボタン ===== */
+  #locBtn { position: fixed; right: 14px; bottom: calc(150px + env(safe-area-inset-bottom)); width: 46px; height: 46px; border-radius: 50%; background: var(--surface); box-shadow: var(--shadow-l); border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 120; color: var(--green); transition: transform .1s; }
+  #locBtn:active { transform: scale(.92); }
+  #locBtn.loading { color: var(--muted); }
+  #locBtn svg { width: 22px; height: 22px; }
+  body.vmode #locBtn { display: none; }
   .maplibregl-popup-content { font-family: var(--round); font-weight: 800; font-size: 12.5px; padding: 7px 12px; border-radius: 999px; box-shadow: var(--shadow); }
   .maplibregl-popup-tip { display: none; }
 
@@ -213,6 +251,25 @@
 
 <div id="status">読み込み中...</div>
 
+<!-- スポット一覧（地図モード） -->
+<div id="searchWrap">
+  <button id="listBtn">
+    <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+    スポット一覧
+    <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+  </button>
+  <div id="searchResults"></div>
+  <div id="groupBar">
+    <div class="group-chip" data-g="campus"><span class="dot"></span>大学周辺</div>
+    <div class="group-chip" data-g="member"><span class="dot"></span>メンバーのスポット</div>
+  </div>
+</div>
+
+<!-- 現在地ボタン -->
+<button id="locBtn" aria-label="現在地へ">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+</button>
+
 <!-- 地図モード：ミニプレーヤー -->
 <div id="mini">
   <div id="miniHead">
@@ -223,7 +280,7 @@
   <p id="miniDesc"></p>
   <div class="mini-foot">
     <button class="chip primary" id="miniToVideo"><svg class="ic" viewBox="0 0 24 24"><path d="m9 7 8 5-8 5V7Z"/></svg>動画モードで見る</button>
-    <button class="chip" id="miniJump" style="display:none"><svg class="ic" viewBox="0 0 24 24"><path d="M12 21s-6-5.2-6-10a6 6 0 1 1 12 0c0 4.8-6 10-6 10Z"/><circle cx="12" cy="11" r="2.2"/></svg>麗澤大学へ</button>
+    <button class="chip" id="miniJump" style="display:none"><svg class="ic" viewBox="0 0 24 24"><path d="M4 12h13M13 6l6 6-6 6"/></svg>次のメンバー</button>
     <button class="chip" id="miniShare"><svg class="ic" viewBox="0 0 24 24"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 15V4m0 0L8 8m4-4 4 4"/></svg>共有</button>
   </div>
 </div>
@@ -280,7 +337,7 @@
   const SHEET_ID = '172EjAWId_IgXCqYVE-1OShEyka6SF7xOSbxCSqWrbqM';
   const GID = 0;
   const FORCED_SHORTS = ['6vzIkPSp_A8'];   // 必ず縦型で表示する動画ID
-  const JUMP_IDS = [8, 11, 12, 13];        // 「麗澤大学へ飛ぶ」ボタンを出す行のID（将来ここを編集）
+  const JUMP_IDS = [7, 8, 9, 10];          // メンバー紹介：この順で「次のメンバーへ」巡回（将来ここを編集）
 
   let videoData = [], bounds = null, current = 0;
 
@@ -301,7 +358,7 @@
           paint: { 'fill-extrusion-color': '#f2efe6', 'fill-extrusion-height': ['get', 'height'], 'fill-extrusion-opacity': .92, 'fill-extrusion-vertical-gradient': true } }
       ]
     },
-    center: CAMPUS, zoom: 15.5, minZoom: 2, maxZoom: 19, maxPitch: 70
+    center: CAMPUS, zoom: 14.5, minZoom: 2, maxZoom: 19, maxPitch: 70
   });
   map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-right');
 
@@ -333,6 +390,7 @@
       const iLatB = colIdx(cols, ['lat-b', 'latb', 'lat_b']);
       const iLngB = colIdx(cols, ['lon-b', 'lonb', 'lon_b', 'lng-b']);
       const iId = colIdx(cols, ['id']);
+      const iPlc = colIdx(cols, ['place', '場所', 'スポット']);
       const iYt = colIdx(cols, ['youtubeid', 'youtube', 'videoid']);
       const iTtl = colIdx(cols, ['title', 'タイトル']);
       const iDsc = colIdx(cols, ['description', '概要', '説明']);
@@ -345,14 +403,15 @@
         const latB = parseFloat(val(iLatB)), lngB = parseFloat(val(iLngB));
         const rowId = parseInt(val(iId), 10);
         const id = val(iYt) ? ytId(val(iYt)) : null;
+        const place = val(iPlc);
         const title = val(iTtl) || id || `スポット ${n + 1}`;
         const desc = val(iDsc);
         const type = val(iTyp).toLowerCase();
         const shorts = FORCED_SHORTS.includes(id) || type.includes('short') || type.includes('縦')
           || /short|ショート|縦/i.test(`${title} ${desc}`);
-        // 対象ID かつ 第2座標が有効なときだけ「麗澤大学へ飛ぶ」ボタンを出す
-        const hasJump = JUMP_IDS.includes(rowId) && !isNaN(latB) && !isNaN(lngB);
-        return { title, lat, lng, latB, lngB, rowId, id, desc, shorts, hasJump };
+        // メンバーのスポット（JUMP_IDS）だけ「次のメンバーへ」ボタンを出す
+        const hasJump = JUMP_IDS.includes(rowId);
+        return { title, place, lat, lng, latB, lngB, rowId, id, desc, shorts, hasJump };
       }).filter(d => !isNaN(d.lat) && !isNaN(d.lng) && d.id);
 
       setStatus(`${videoData.length} 件のスポット`);
@@ -368,10 +427,17 @@
     videoData.forEach(addPin);
     buildFeed();
 
-    bounds = new maplibregl.LngLatBounds();
-    videoData.forEach(d => bounds.extend([d.lng, d.lat]));
-    map.fitBounds(bounds, { padding: 90, maxZoom: 17, duration: 1600 });
-    setTimeout(() => $('status').classList.add('fade'), 3500);
+    // 起動時は「南柏駅〜麗澤大学」が両方見える範囲を表示。
+    // 上のバー（一覧ボタン等）に南柏が隠れないよう上側の余白を大きめに取る。
+    const MINAMIKASHIWA = [139.9494, 35.8478];   // 南柏駅（おおよそ）
+    const startBounds = new maplibregl.LngLatBounds();
+    startBounds.extend(MINAMIKASHIWA);
+    startBounds.extend(CAMPUS);
+    map.fitBounds(startBounds, {
+      padding: { top: 150, bottom: 90, left: 50, right: 50 },
+      duration: 1400, essential: true, maxZoom: 16
+    });
+    setTimeout(() => $('status').classList.add('fade'), 3000);
   }
 
   /* ---------- 保存・履歴（localStorageが使えれば永続化、ダメならメモリ） ---------- */
@@ -406,6 +472,8 @@
     el.appendChild(img);
     const mk = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([d.lng, d.lat]).addTo(map);
     d.marker = mk;
+    d.group = (d.rowId >= 1 && d.rowId <= 6) ? 'campus' : 'member';
+    el.dataset.group = d.group;
     el.addEventListener('mouseenter', () => popup.setLngLat([d.lng, d.lat]).setHTML(d.title).addTo(map));
     el.addEventListener('mouseleave', () => popup.remove());
     el.addEventListener('click', e => { e.stopPropagation(); openMini(i); });
@@ -461,8 +529,96 @@
   /* ---------- 埋め込みURL（YouTubeのコントロールは表示する） ---------- */
   const embed = id => `https://www.youtube.com/embed/${id}?autoplay=1&rel=0&modestbranding=1&playsinline=1`;
 
-  /* ---------- ミニプレーヤー（地図モード・ドラッグ可） ---------- */
-  const mini = $('mini');
+  /* ---------- スポット一覧（ボタンで開閉・選ぶと飛ぶ） ---------- */
+  const listBtn = $('listBtn'), searchResults = $('searchResults');
+
+  function buildList() {
+    const campus = [], member = [];
+    videoData.forEach((d, i) => (d.group === 'campus' ? campus : member).push({ d, i }));
+    const row = ({ d, i }) => `
+      <div class="sr-item" data-i="${i}">
+        <div class="sr-thumb" style="background-image:url('https://img.youtube.com/vi/${d.id}/default.jpg')"></div>
+        <div class="sr-text">
+          <div class="sr-title">${d.title}</div>
+          <div class="sr-place">${d.place || ''}</div>
+        </div>
+        <button class="sr-go" data-i="${i}"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h13M13 6l6 6-6 6"/></svg>飛ぶ</button>
+      </div>`;
+    let html = '<div class="sr-scroll">';
+    if (campus.length) html += '<div class="sr-group-label">大学周辺</div>' + campus.map(row).join('');
+    if (member.length) html += '<div class="sr-group-label">メンバーのスポット</div>' + member.map(row).join('');
+    html += '</div>';
+    searchResults.innerHTML = html;
+    // 行全体・飛ぶボタンどちらでも飛ぶ
+    searchResults.querySelectorAll('.sr-item').forEach(el => {
+      el.onclick = () => goToSpot(+el.dataset.i);
+    });
+    searchResults.querySelectorAll('.sr-go').forEach(b => {
+      b.onclick = e => { e.stopPropagation(); goToSpot(+b.dataset.i); };
+    });
+  }
+
+  function openList() { buildList(); searchResults.classList.add('show'); listBtn.classList.add('open'); }
+  function closeList() { searchResults.classList.remove('show'); listBtn.classList.remove('open'); }
+
+  function goToSpot(i) {
+    const d = videoData[i];
+    closeList();
+    map.flyTo({ center: [d.lng, d.lat], zoom: 18, duration: 1200, essential: true });
+    setTimeout(() => openMini(i), 1100);
+  }
+
+  listBtn.onclick = e => {
+    e.stopPropagation();
+    searchResults.classList.contains('show') ? closeList() : openList();
+  };
+  // 一覧の外をタップしたら閉じる
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#searchWrap')) closeList();
+  });
+
+  /* ---------- グループ表示切替（大学周辺 / メンバーのスポット） ---------- */
+  const groupOn = { campus: true, member: true };
+  function applyGroups() {
+    videoData.forEach(d => {
+      const el = d.marker && d.marker.getElement();
+      if (el) el.style.display = groupOn[d.group] ? '' : 'none';
+    });
+  }
+  document.querySelectorAll('.group-chip').forEach(chip => {
+    chip.onclick = () => {
+      const g = chip.dataset.g;
+      groupOn[g] = !groupOn[g];
+      chip.classList.toggle('off', !groupOn[g]);
+      applyGroups();
+    };
+  });
+
+  /* ---------- 現在地へ ---------- */
+  let locMarker = null;
+  $('locBtn').onclick = () => {
+    const btn = $('locBtn');
+    if (!navigator.geolocation) { alert('この端末では現在地を取得できません。'); return; }
+    btn.classList.add('loading');
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        btn.classList.remove('loading');
+        const { longitude: lng, latitude: lat } = pos.coords;
+        if (locMarker) locMarker.remove();
+        const el = document.createElement('div');
+        el.style.cssText = 'width:18px;height:18px;border-radius:50%;background:#1a73e8;border:3px solid #fff;box-shadow:0 0 0 2px rgba(26,115,232,.4);';
+        locMarker = new maplibregl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
+        map.flyTo({ center: [lng, lat], zoom: 16, duration: 1400, essential: true });
+      },
+      err => {
+        btn.classList.remove('loading');
+        alert('現在地を取得できませんでした。位置情報の許可を確認してください。');
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
+
   let activeMini = -1;
   function openMini(i) {
     current = i; activeMini = i;
@@ -488,16 +644,24 @@
   $('miniClose').onclick = closeMini;
   $('miniToVideo').onclick = () => { closeMini(); setMode('video'); };
   $('miniShare').onclick = () => share(current);
-  $('miniJump').onclick = () => jumpToCampus(current);
+  $('miniJump').onclick = () => jumpToNextMember(current);
 
-  // 第2座標（麗澤大学）へ地図で飛ぶ
-  function jumpToCampus(i) {
+  // 次のメンバーのスポットへ飛ぶ（7→8→9→10→7 の順にループ）
+  function jumpToNextMember(i) {
     const d = videoData[i];
     if (!d || !d.hasJump) return;
+    // JUMP_IDS の並び順で「今の次」を探す（末尾なら先頭に戻る）
+    const pos = JUMP_IDS.indexOf(d.rowId);
+    if (pos < 0) return;
+    const nextRowId = JUMP_IDS[(pos + 1) % JUMP_IDS.length];
+    const ni = videoData.findIndex(v => v.rowId === nextRowId);
+    if (ni < 0) return;
+    const nd = videoData[ni];
     closeMini();
     if ($('videoMode').classList.contains('show')) setMode('map');
-    map.flyTo({ center: [d.lngB, d.latB], zoom: 17, duration: 1600, essential: true });
-    toast('麗澤大学へ移動しました');
+    map.flyTo({ center: [nd.lng, nd.lat], zoom: 17, duration: 1400, essential: true });
+    setTimeout(() => openMini(ni), 1300);
+    toast(`次のメンバー：${nd.title}`);
   }
 
   // 矢印の更新（ピン先端 → ミニプレーヤーの最も近い辺）
@@ -579,7 +743,7 @@
 
         <div class="rail">
           <button class="map" data-a="map"><span class="circle"><svg class="ic" viewBox="0 0 24 24"><path d="M12 21s-6-5.2-6-10a6 6 0 1 1 12 0c0 4.8-6 10-6 10Z"/><circle cx="12" cy="11" r="2.2"/></svg></span><small>地図</small></button>
-          ${d.hasJump ? `<button class="jump" data-a="jump"><span class="circle"><svg class="ic" viewBox="0 0 24 24"><path d="M4 12h13M13 6l6 6-6 6"/></svg></span><small>大学へ</small></button>` : ''}
+          ${d.hasJump ? `<button class="jump" data-a="jump"><span class="circle"><svg class="ic" viewBox="0 0 24 24"><path d="M4 12h13M13 6l6 6-6 6"/></svg></span><small>次へ</small></button>` : ''}
           <button data-a="save"><span class="circle"><svg class="ic" viewBox="0 0 24 24"><path d="M6 4h12a1 1 0 0 1 1 1v15l-7-4-7 4V5a1 1 0 0 1 1-1Z"/></svg></span><small>保存</small></button>
           <button data-a="share"><span class="circle"><svg class="ic" viewBox="0 0 24 24"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 15V4m0 0L8 8m4-4 4 4"/></svg></span><small>共有</small></button>
           <div class="navpair">
@@ -602,7 +766,7 @@
         e.stopPropagation();
         const a = b.dataset.a, d = videoData[i];
         if (a === 'map') { setMode('map'); map.flyTo({ center: [d.lng, d.lat], zoom: 18, duration: 1200 }); setTimeout(() => openMini(i), 1200); }
-        else if (a === 'jump') jumpToCampus(i);
+        else if (a === 'jump') jumpToNextMember(i);
         else if (a === 'share') share(i);
         else if (a === 'save') { const on = toggleSaved(d.id); b.classList.toggle('saved', on); toast(on ? '保存しました' : '保存を解除しました'); refreshHistory(); }
         else if (a === 'next') goSlot(Math.min(i + 1, videoData.length - 1));
